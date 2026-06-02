@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# 虚拟环境
+venv/
+.venv/
+
+# 环境变量
+.env
+
+# 向量数据库
+data/chroma_db/
+data/chroma_mini/
+
+# 上传文件目录（保留目录结构但忽略文件）
+data/uploads/*
+!data/uploads/.gitkeep
+
+# 日志
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 临时文件
+_test_*.py
+_test_*.txt
