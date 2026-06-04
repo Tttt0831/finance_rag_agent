@@ -14,14 +14,12 @@ import gradio as gr
 from agent import create_finance_agent, get_agent_response
 from services.vector_store import vector_store_service
 from utils.logger import get_logger
-from utils.path import get_file_md5
-from config import settings
 
 logger = get_logger(__name__)
 
 # ── 初始化 Agent（全局单例）────────────────────────────────────
 logger.info("应用启动，初始化金融 Agent...")
-_agent = create_finance_agent(persistent_memory=False)
+_agent = create_finance_agent()
 logger.info("金融 Agent 初始化完成，等待用户连接。")
 
 # ── 预加载内置知识库 ─────────────────────────────────────────
@@ -69,7 +67,9 @@ def chat(
     response = get_agent_response(_agent, user_message, session_id)
 
     logger.info(f"[Agent 回复] {response[:100]}...")
-    history.append((user_message, response))
+    # Gradio 6 Chatbot 使用 dict 格式
+    history.append({"role": "user", "content": user_message})
+    history.append({"role": "assistant", "content": response})
     return "", history
 
 

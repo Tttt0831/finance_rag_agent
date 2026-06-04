@@ -1,6 +1,11 @@
 """
 middleware/callbacks.py - Agent 中间件（回调处理器）
 负责：日志记录 / 工具调用追踪 / 执行时间统计
+
+注意: 迁移到 LangGraph 后此模块尚未接入。
+LangGraph 的回调通过 astream_events() 或 CallbackHandler 实现，
+与 langchain_classic 的 AgentExecutor 回调机制不同。
+待后续适配 LangGraph 回调后再启用。
 """
 
 import time

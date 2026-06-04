@@ -4,7 +4,6 @@ server.py - 文档上传 Web 服务（FastAPI）
 """
 
 import os
-import shutil
 from typing import List
 
 import uvicorn
@@ -14,7 +13,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from services.vector_store import vector_store_service
 from utils.logger import get_logger
-from utils.path import get_file_md5
 from config import settings
 
 logger = get_logger(__name__)

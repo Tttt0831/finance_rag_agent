@@ -1,62 +1,75 @@
-# 💹 财智助手 · 金融 Agent 项目
+# 💹 财智助手 — AI 金融分析师 Agent
 
-基于 **LangChain + RAG + ReAct Agent** 构建的 AI 金融分析师。
+基于 **LangChain + LangGraph + DeepSeek + RAG** 的智能金融分析助手。
 
-- **LLM**: DeepSeek（OpenAI 兼容接口）
-- **Embedding**: HuggingFace 本地模型 `BAAI/bge-small-zh-v1.5`（免费，无需 API Key）
-- **前端**: Gradio 6.x 聊天界面
-- **API 服务**: FastAPI（可选）
+```
+你: "帮我分析一下茅台的估值"       你: "10万投8%的年化，10年后多少？"
+Agent: [调取实时股价] →             Agent: [调用复利计算器] →
+       [检索知识库: PE/估值] →             "最终 215,892 元，收益 115.89%"
+       "茅台 PE 19.2，处于合理区间..."
+```
 
-> 🧩 **入门学习**：想快速理解整个架构？查看 [finance_agent_mini.py](finance_agent_mini.py) —— 同一架构，单文件 ~280 行，7 层注解，3 分钟读完全流程。
+---
+
+## 🧩 三层学习路径
+
+| 文件 | 行数 | 用途 | 适合 |
+|------|------|------|------|
+| **[finance_agent_skeleton.py](finance_agent_skeleton.py)** | ~280 | 填空学习版，6 个 STEP 渐进式 TODO | 🟢 入门 |
+| **[finance_agent_mini.py](finance_agent_mini.py)** | ~260 | 完整参考实现，逐段注解 | 🟡 理解 |
+| **完整项目** (app.py + agent.py + tools/...) | ~800 | 生产级架构，8 工具 + FastAPI | 🔴 深入 |
+
+> **建议顺序**: skeleton（自己动手）→ mini（对照答案）→ 完整项目（看工程化）
 
 ---
 
 ## 📁 项目结构
 
 ```
-finance_agent/
-├── .env / .env.example   # 环境变量（API Key 等）
-├── requirements.txt      # 依赖清单
-├── config.py             # 全局配置管理（pydantic-settings）
-├── finance_agent_mini.py # 🔥 超级缩略版（单文件蓝图，入门学习用）
+finance-agent/
+├── 📖 学习文件
+│   ├── finance_agent_skeleton.py  # 填空学习版 (6 STEP 渐进式)
+│   └── finance_agent_mini.py      # 完整参考实现 (对应 skeleton 答案)
 │
-├── utils/                # 工具函数
-│   ├── logger.py         # 统一日志（输出到控制台 + 文件）
-│   └── path.py           # 路径工具（MD5去重、路径拼接）
+├── 🚀 生产代码
+│   ├── app.py                     # Gradio 前端 (主入口)
+│   ├── agent.py                   # Agent 组装 (LangGraph)
+│   ├── server.py                  # FastAPI REST API
+│   ├── config.py                  # 全局配置 (pydantic-settings)
+│   │
+│   ├── tools/
+│   │   └── finance_tools.py       # 8 个金融工具 (腾讯财经 API)
+│   │
+│   ├── services/
+│   │   ├── vector_store.py        # ChromaDB 向量存储
+│   │   └── rag_service.py         # RAG 检索增强生成
+│   │
+│   ├── middleware/
+│   │   └── callbacks.py           # 日志回调 (LangGraph 待适配)
+│   │
+│   ├── utils/
+│   │   ├── logger.py              # 统一日志
+│   │   └── path.py                # 路径工具
+│   │
+│   └── prompts/
+│       └── agent_system_prompt.txt # Agent 系统提示词
 │
-├── services/             # 核心服务
-│   ├── vector_store.py   # 向量存储服务（文档入库、相似度检索）
-│   └── rag_service.py    # RAG 问答服务（检索 + LLM 生成）
+├── data/
+│   ├── finance_knowledge.txt      # 内置金融知识
+│   └── uploads/                   # 用户上传文档
 │
-├── tools/
-│   └── finance_tools.py  # Agent 工具集（8个金融工具）
-│
-├── middleware/
-│   └── callbacks.py      # 日志中间件（LLM/工具调用全链路追踪）
-│
-├── prompts/
-│   └── agent_system_prompt.txt  # Agent 系统提示词
-│
-├── agent.py              # Agent 核心组装（LLM + Tools + Memory）
-├── app.py                # Gradio 前端界面（主入口）
-├── server.py             # FastAPI REST API（可选，独立部署）
-│
-└── data/
-    ├── finance_knowledge.txt  # 内置金融知识文档（自动加载）
-    ├── uploads/               # 用户上传文档存储目录
-    ├── knowledge/             # 额外知识文档目录
-    ├── chroma_db/             # 向量数据库持久化目录（自动创建）
-    └── .indexed_md5.txt       # 已入库文件的 MD5 记录（去重用）
+├── .env.example                   # 环境变量模板
+├── requirements.txt               # Python 依赖
+└── README.md                      # 本文件
 ```
 
 ---
 
-## 🚀 快速开始
+## 🚀 快速启动
 
 ### 1. 安装依赖
 
 ```bash
-# 建议使用 Python 3.10+
 pip install -r requirements.txt
 ```
 
@@ -64,149 +77,186 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# 编辑 .env，填入你的 DeepSeek API Key
 ```
 
-`.env` 内容示例：
+编辑 `.env`:
 ```
-DEEPSEEK_API_KEY=sk-your-api-key-here
+DEEPSEEK_API_KEY=sk-your-key-here
 ```
 
-> 在 [DeepSeek 开放平台](https://platform.deepseek.com/) 获取 API Key。
+> 在 [DeepSeek 开放平台](https://platform.deepseek.com/) 获取 API Key
 
-### 3. 启动 Gradio 前端（主入口）
+### 3. 启动
 
 ```bash
-python app.py
-```
-
-浏览器访问 `http://localhost:7860` 即可使用。
-
-### 4. （可选）启动 FastAPI 接口服务
-
-```bash
-python server.py
-# 接口文档：http://localhost:8000/docs
-```
-
-### 5. 🧩 入门学习：运行缩略版
-
-```bash
+# 学习版（推荐先跑这个）
 python finance_agent_mini.py
+
+# 完整版
+python app.py
+
+# 可选: FastAPI 服务
+python server.py    # http://localhost:8000/docs
 ```
 
-一个文件，~280 行，完整演示项目 7 层架构。详细注解请直接阅读 [finance_agent_mini.py](finance_agent_mini.py)。
+浏览器访问 `http://localhost:7860`
 
 ---
 
-## 🤖 Agent 工具列表
+## 🤖 8 个 Agent 工具
 
-| 工具名 | 功能 | 数据来源 |
-|--------|------|----------|
-| `search_knowledge_base` | 检索金融知识库（RAG）| 本地 Chroma 向量库 |
-| `get_stock_realtime` | A股实时行情（价格/涨跌/市值）| AKShare |
-| `get_stock_history` | 股票历史K线数据 | AKShare |
-| `get_stock_financial` | 财务指标（PE/PB/换手率）| AKShare |
-| `get_market_index` | 主要市场指数实时行情 | AKShare |
-| `get_fund_info` | 公募基金净值与表现 | AKShare |
-| `calculate_financial` | 金融计算器（复利/收益率/仓位）| 本地计算 |
-| `get_current_datetime` | 当前时间与交易日判断 | 系统时间 |
-
----
-
-## 💬 使用示例
-
-**查询股票行情：**
-```
-用户: 帮我查一下贵州茅台的今天股价
-Agent: [调用 get_stock_realtime("600519")]
-       贵州茅台（600519）最新价：1668.00元，涨跌幅：+1.23%...
-```
-
-**金融知识问答（RAG）：**
-```
-用户: 什么是市盈率，多少算合理？
-Agent: [调用 search_knowledge_base("市盈率")]
-       根据知识库：市盈率 = 股价 / 每股收益，反映...
-```
-
-**金融计算：**
-```
-用户: 我用10万本金，年化8%，投资10年能有多少？
-Agent: [调用 calculate_financial(calc_type="compound", principal=100000, rate=8, years=10)]
-       复利计算结果：最终金额：215,892.50 元，总收益：115,892.50 元...
-```
-
-**上传私有文档后问答：**
-```
-# 上传一份公司年报 PDF
-# Agent 会基于年报内容回答问题
-用户: 这份年报里公司的净利润增速是多少？
-Agent: [调用 search_knowledge_base("净利润增速")]
-       根据知识库（来源：annual_report.pdf）...
-```
+| 工具 | 功能 | 数据来源 |
+|------|------|----------|
+| `search_knowledge_base` | 检索金融知识库 | 本地 ChromaDB + LLM 总结 |
+| `get_stock_realtime` | A股实时行情 (价格/涨跌/PE/市值) | 腾讯财经 `qt.gtimg.cn` |
+| `get_stock_history` | 历史 K 线 (日/周/月线) | 腾讯财经 `web.ifzq.gtimg.cn` |
+| `get_stock_financial` | 财务指标 (PE/市值/换手率) | 腾讯财经 |
+| `get_market_index` | 上证/深证/创业板/科创50/沪深300 | 腾讯财经 |
+| `get_fund_info` | 基金净值 | 天天基金 `1234567.com.cn` |
+| `calculate_financial` | 复利/收益率/PE/PB/仓位计算 | 本地计算 |
+| `get_current_datetime` | 当前时间 + 交易日判断 | 系统时间 |
 
 ---
 
-## ⚙️ 配置说明（config.py）
+## 🏗️ 架构深度解析
+
+### Agent 的生命周期
+
+```
+ ┌──────────────────────────────────────────────────────┐
+ │                    用户输入                           │
+ │              "茅台 PE 多少？合理吗？"                    │
+ └──────────────────┬───────────────────────────────────┘
+                    ▼
+ ┌──────────────────────────────────────────────────────┐
+ │  LangGraph Agent (create_react_agent)                 │
+ │                                                      │
+ │  ┌─────────┐   ┌──────────┐   ┌──────────────────┐   │
+ │  │  LLM    │──▶│ 需要工具？│──▶│ 调用 get_stock_  │   │
+ │  │ DeepSeek│   │          │   │ realtime("600519")│   │
+ │  └─────────┘   └──────────┘   └───────┬──────────┘   │
+ │       ▲                    │           │              │
+ │       │              直接回答          │ 工具结果      │
+ │       │                    │           ▼              │
+ │       │              ┌──────────┐  ┌──────────────┐  │
+ │       └──────────────│ 生成回复 │◀─│ 调用 search_ │  │
+ │                      │          │  │ knowledge()  │  │
+ │                      └──────────┘  └──────────────┘  │
+ └──────────────────────────────────────────────────────┘
+                    ▼
+              "茅台 PE 19.2，处于合理估值区间..."
+```
+
+### 核心组件职责
+
+| 组件 | 一句话 | 技术 |
+|------|--------|------|
+| **LLM** | 大脑 - 理解问题、决策、生成回答 | DeepSeek (OpenAI 兼容) |
+| **Tools** | 手和眼 - 获取外部数据、执行计算 | `@tool` + 腾讯 API |
+| **RAG** | 记忆库 - 检索私有文档、专业概念 | ChromaDB + HuggingFace Embedding |
+| **Agent** | 调度中心 - 协调 LLM + Tools 的循环推理 | LangGraph `create_react_agent` |
+| **Memory** | 对话历史 - 让 Agent 记住之前的上下文 | LangGraph `MemorySaver` |
+| **UI** | 界面 - 浏览器中的聊天窗口 | Gradio `ChatInterface` |
+
+### 为什么用 LangGraph 而不是 langchain_classic？
+
+| | langchain_classic | LangGraph |
+|------|------|------|
+| 工具调用 | 文本格式解析 (解析 `Action:` `Action Input:`) | 原生 function calling (JSON) |
+| 可靠性 | 模型格式稍偏就解析失败 | 不存在解析问题 |
+| 记忆 | `RunnableWithMessageHistory` (已弃用) | `MemorySaver` (内置持久化) |
+| 控制流 | 线性的 ReAct 循环 | 可自定义的图结构 |
+
+---
+
+## 📊 数据流全景
+
+```
+                    ┌──────────────┐
+                    │   Gradio UI  │  ← 用户浏览器
+                    └──────┬───────┘
+                           │ chat()
+                           ▼
+              ┌────────────────────────┐
+              │    LangGraph Agent      │
+              │  (create_react_agent)   │
+              │                        │
+              │  ┌──────────────────┐  │
+              │  │   DeepSeek LLM   │  │  ← 推理引擎
+              │  └──────────────────┘  │
+              │         │              │
+              │    tool calling?       │
+              │    ┌────┴────┐         │
+              │    ▼         ▼         │
+              │ ┌──────┐ ┌──────┐      │
+              │ │腾讯API│ │Chroma│      │  ← 数据源
+              │ │股票/基│ │ RAG  │      │
+              │ │金/指数│ │知识库│      │
+              │ └──────┘ └──────┘      │
+              │    │         │         │
+              │    └────┬────┘         │
+              │         ▼              │
+              │  ┌──────────────┐      │
+              │  │ 组装最终回复  │      │  ← 综合结果
+              │  └──────────────┘      │
+              └────────────────────────┘
+                           │
+                           ▼
+                     用户看到回复
+```
+
+---
+
+## ⚙️ 配置说明
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `model_name` | `deepseek-chat` | LLM 模型，DeepSeek OpenAI 兼容接口 |
-| `temperature` | `0.3` | 金融场景建议偏低（更准确），创意场景可调高到 0.7 |
-| `embedding_model` | `BAAI/bge-small-zh-v1.5` | 本地中文嵌入模型（HuggingFace，免费） |
-| `retriever_k` | `4` | RAG 检索返回的文档块数量 |
-| `chunk_size` | `600` | 文本分块大小（字符数） |
-| `agent_max_iterations` | `8` | Agent 最大工具调用次数 |
-| `deepseek_base_url` | `https://api.deepseek.com/v1` | DeepSeek API 地址（兼容 OpenAI 格式） |
+| `DEEPSEEK_API_KEY` | (必填) | DeepSeek API Key |
+| `model_name` | `deepseek-chat` | LLM 模型 |
+| `temperature` | `0.3` | 温度参数 (金融场景偏低) |
+| `embedding_model` | `BAAI/bge-small-zh-v1.5` | HuggingFace 嵌入模型 |
+| `retriever_k` | `4` | RAG 检索文档数 |
+| `chunk_size` | `600` | 文本分块大小 |
+| `CHROMA_PERSIST_DIR` | `./data/chroma_db` | 向量库路径 |
+
+---
+
+## 🔧 常见问题
+
+**Q: 股票数据查不到？**
+A: 腾讯财经 API 需要能访问 `qt.gtimg.cn`。如果开了代理 (如 Clash)，确认该域名走直连或代理能通。
+
+**Q: 知识库检索失败？**
+A: 检查 `data/chroma_db/` 目录是否存在。删除后重启会自动重建。首次启动需下载嵌入模型 (~100MB)。
+
+**Q: 想换其他 LLM？**
+A: 修改 `.env` 中的 `DEEPSEEK_API_KEY`、`deepseek_base_url`、`model_name` 即可。任何 OpenAI 兼容接口都支持。
+
+**Q: skeleton/mini/完整版 之间怎么切换？**
+A: skeleton 是不完整的（需填空），mini 是能跑的单文件参考，完整版是模块化工程代码。建议按 skeleton→mini→完整 顺序学习。
 
 ---
 
 ## 📌 注意事项
 
-1. **数据时效性**：股票/基金数据通过 AKShare 实时获取，非交易时间可能无最新数据；东方财富 API 在不稳定网络环境（如代理/VPN）下可能连接失败
-2. **投资免责**：本工具所有输出仅供参考，不构成投资建议
-3. **API 配额**：DeepSeek API 有调用限制，请合理使用
-4. **向量库持久化**：向量数据存储在 `./data/chroma_db/`，删除该目录会清空知识库；更换 Embedding 模型后需清空重建
-5. **首次启动**：HuggingFace 嵌入模型会在首次运行时自动下载（约 100MB），请确保网络畅通
+1. ⚠️ 所有输出仅供参考，不构成投资建议
+2. 📡 股票数据在非交易时间可能无最新价
+3. 🔑 DeepSeek API 有调用配额限制
+4. 💾 向量数据存储在 `./data/chroma_db/`，更换 Embedding 模型后需删除重建
+5. 🐍 建议 Python 3.10+
 
 ---
 
-## 🏗️ 技术架构
+## 🛠️ 技术栈
 
-```
-用户输入
-    │
-    ▼
-Gradio 前端 (app.py)
-    │
-    ▼
-RunnableWithMessageHistory（带记忆）
-    │
-    ▼
-AgentExecutor（ReAct 框架）
-    │
-    ├── [工具选择] ──► 8 个金融工具
-    │                    ├── RAG 知识库检索 (Chroma + HuggingFace Embedding)
-    │                    ├── AKShare 金融数据 API
-    │                    └── 本地计算函数
-    │
-    ├── [LLM 推理] ──► DeepSeek (via OpenAI 兼容接口)
-    │
-    └── [日志中间件] ── FinanceAgentCallback (全链路追踪)
-```
-
----
-
-## 🧩 缩略版对照
-
-| 完整项目 (10 文件) | 缩略版 (1 文件) | 层级 |
-|---------------------|-----------------|------|
-| `.env` / `config.py` | `os.getenv()` + 常量 | 第 1 层 — 配置 |
-| `services/vector_store.py` + `services/rag_service.py` | `vectorstore` + `_rag_query()` | 第 2+4 层 — 模型 + RAG |
-| `tools/finance_tools.py` (8 工具) | `@tool` × 3 | 第 3 层 — 工具集 |
-| `agent.py` + `middleware/callbacks.py` | `create_agent()` + `_get_history()` | 第 5 层 — Agent |
-| `app.py` (Gradio Blocks) | `gr.ChatInterface` | 第 6 层 — UI |
-| `server.py` (FastAPI) | （省略） | — |
-
-查看 [finance_agent_mini.py](finance_agent_mini.py) 获取完整逐行注解。
+| 层 | 技术 |
+|------|------|
+| LLM | DeepSeek (OpenAI 兼容) |
+| Agent 框架 | LangGraph |
+| 工具框架 | LangChain `@tool` |
+| 嵌入模型 | HuggingFace `BAAI/bge-small-zh-v1.5` |
+| 向量数据库 | ChromaDB |
+| 前端 | Gradio 6.x |
+| API 服务 | FastAPI |
+| 金融数据 | 腾讯财经 API + 天天基金 API |
+| 配置 | pydantic-settings + python-dotenv |

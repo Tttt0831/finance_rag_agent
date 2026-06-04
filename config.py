@@ -27,10 +27,6 @@ class Settings(BaseSettings):
     chunk_size: int = Field(default=600, description="文本分块大小")
     chunk_overlap: int = Field(default=80, description="分块重叠字符数")
 
-    # ── Agent 配置 ──────────────────────────────────────────
-    agent_max_iterations: int = Field(default=8, description="Agent 最大循环次数")
-    agent_verbose: bool = Field(default=True, description="是否打印 Agent 推理过程")
-
     # ── 日志配置 ──────────────────────────────────────────
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
     log_dir: str = "./logs"

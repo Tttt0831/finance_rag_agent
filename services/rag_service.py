@@ -4,10 +4,9 @@ services/rag_service.py - RAG 问答服务
 """
 
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
-from langchain_core.messages import HumanMessage, AIMessage
 
 from config import settings
 from services.vector_store import vector_store_service
@@ -19,20 +18,18 @@ logger = get_logger(__name__)
 _RAG_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system",
-        """你是一位专业的金融分析师助手，具备丰富的股票、基金、债券、宏观经济等金融领域知识。
-请根据以下【知识库内容】回答用户问题。
+        """你是一位专业的金融分析师助手。请根据以下【知识库内容】回答用户问题。
 
 回答要求：
 1. 优先使用知识库中的信息，引用时请说明"根据知识库..."
 2. 如知识库中无相关信息，可结合自身知识回答，但需注明"以下为通用金融知识"
 3. 涉及投资建议时，必须在末尾加免责声明："以上内容仅供参考，不构成投资建议，投资有风险，入市须谨慎。"
-4. 回答要专业、简洁、有条理，可适当使用列表或小标题
+4. 回答要专业、简洁、有条理，可使用列表或小标题
 
 【知识库内容】
 {context}
 """,
     ),
-    MessagesPlaceholder(variable_name="chat_history"),
     ("human", "{question}"),
 ])
 
@@ -76,7 +73,6 @@ class RagService:
             {
                 "context": self._retriever | _format_docs,
                 "question": RunnablePassthrough(),
-                "chat_history": lambda _: [],   # 无历史时默认空列表
             }
             | _RAG_PROMPT
             | self._llm
@@ -88,46 +84,20 @@ class RagService:
     def query(self, question: str, chat_history: list = None) -> str:
         """
         单次问答（供 Agent 工具调用）。
-
-        Args:
-            question: 用户问题
-            chat_history: 历史消息列表，格式 [("human", "..."), ("ai", "..."), ...]
-
-        Returns:
-            回答字符串
         """
-        # 构建历史消息
-        history_messages = []
-        for role, content in (chat_history or []):
-            if role == "human":
-                history_messages.append(HumanMessage(content=content))
-            elif role == "ai":
-                history_messages.append(AIMessage(content=content))
-
-        # 构建带历史的 Prompt
-        prompt_with_history = ChatPromptTemplate.from_messages([
-            _RAG_PROMPT.messages[0],   # system
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("human", "{question}"),
-        ])
-
-        chain = (
-            {
-                "context": self._retriever | _format_docs,
-                "question": lambda x: x["question"],
-                "chat_history": lambda x: x["chat_history"],
-            }
-            | prompt_with_history
-            | self._llm
-            | StrOutputParser()
-        )
-
-        result = chain.invoke({
-            "question": question,
-            "chat_history": history_messages,
-        })
-        logger.debug(f"RAG 回答: {result[:100]}...")
-        return result
+        question = str(question)
+        try:
+            result = self._chain.invoke(question)
+            logger.debug(f"RAG 回答: {str(result)[:100]}...")
+            return str(result)
+        except Exception as e:
+            logger.error(f"RAG invoke 失败: {e}")
+            # 降级：直接返回检索到的文档原文
+            docs = self._retriever.invoke(question)
+            if docs:
+                parts = [f"[来源:{d.metadata.get('source_file','知识库')}] {d.page_content}" for d in docs[:3]]
+                return "（RAG 生成失败，返回原始检索结果）\n\n" + "\n\n---\n\n".join(parts)
+            return f"知识库检索失败: {str(e)[:100]}"
 
     def stream_query(self, question: str):
         """流式问答，返回生成器（供前端实时展示）。"""
