@@ -42,6 +42,27 @@ def _n(val, precision: int = 2):
         return str(val)
 
 
+# 腾讯财经 qt.gtimg.cn 返回的 ~ 分隔字段下标（具名常量，避免魔法数字）
+# 形如: v_sh600519="1~贵州茅台~600519~1689.00~...";  字段顺序固定，下标含义如下：
+_TX_FIELD = {
+    "name": 1,            # 股票名称
+    "price": 3,           # 最新价
+    "prev_close": 4,      # 昨收
+    "open": 5,            # 今开
+    "volume": 6,          # 成交量(手)
+    "change": 31,         # 涨跌额
+    "change_pct": 32,     # 涨跌幅(%)
+    "high": 33,           # 最高
+    "low": 34,            # 最低
+    "turnover": 38,       # 换手率(%)
+    "pe": 39,             # 市盈率(动)
+    "market_cap": 45,     # 总市值
+    "circulation_cap": 46,  # 流通市值
+}
+# 解析所需的最大下标，字段数不足则视为数据异常
+_TX_MIN_FIELDS = max(_TX_FIELD.values()) + 1
+
+
 def _tx_get(codes: list) -> dict:
     """
     调用腾讯财经 API (qt.gtimg.cn)，经用户代理稳定连接。
@@ -53,6 +74,7 @@ def _tx_get(codes: list) -> dict:
     headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://finance.qq.com/"}
     r = requests.get(url, headers=headers, timeout=8)
     r.raise_for_status()
+    r.encoding = "gbk"  # 腾讯接口返回 GBK 编码，否则中文名乱码
     results = {}
     for line in r.text.strip().split("\n"):
         line = line.strip()
@@ -61,14 +83,42 @@ def _tx_get(codes: list) -> dict:
         name_part, data_part = line.split('="', 1)
         code = name_part.split("_")[-1] if "_" in name_part else name_part[2:]
         fields = data_part.rstrip('";').split("~")
-        if len(fields) < 40:
+        if len(fields) < _TX_MIN_FIELDS:
+            # 字段数不足：可能是接口改版或代码无效，跳过并记录便于排查
+            logger.warning(
+                f"[腾讯API] {code} 字段数异常({len(fields)} < {_TX_MIN_FIELDS})，已跳过"
+            )
+            continue
+        results[code] = {key: fields[idx] for key, idx in _TX_FIELD.items()}
+    return results
+
+
+def _tx_get_index(codes: list) -> dict:
+    """
+    获取指数的「简版行情」(s_ 前缀)。腾讯简版只返回约 8~12 个字段，
+    布局与个股完整行情不同：[1]=名称 [3]=最新价 [4]=涨跌额 [5]=涨跌幅%。
+    返回 {code: {"name","price","change","change_pct"}}
+    """
+    import requests
+    url = f"https://qt.gtimg.cn/q={','.join(codes)}"
+    headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://finance.qq.com/"}
+    r = requests.get(url, headers=headers, timeout=8)
+    r.raise_for_status()
+    r.encoding = "gbk"
+    results = {}
+    for line in r.text.strip().split("\n"):
+        line = line.strip()
+        if not line or '="' not in line:
+            continue
+        name_part, data_part = line.split('="', 1)
+        code = name_part.split("v_")[-1]  # 如 v_s_sh000001 -> s_sh000001
+        fields = data_part.rstrip('";').split("~")
+        if len(fields) < 6:
+            logger.warning(f"[腾讯API-指数] {code} 字段数异常({len(fields)})，已跳过")
             continue
         results[code] = {
-            "name": fields[1], "price": fields[3], "prev_close": fields[4],
-            "open": fields[5], "volume": fields[6], "high": fields[33],
-            "low": fields[34], "change": fields[31], "change_pct": fields[32],
-            "pe": fields[39], "market_cap": fields[45], "circulation_cap": fields[46],
-            "turnover": fields[38],
+            "name": fields[1], "price": fields[3],
+            "change": fields[4], "change_pct": fields[5],
         }
     return results
 
@@ -222,7 +272,7 @@ def get_market_index() -> str:
     """
     logger.info("[工具] get_market_index")
     try:
-        data = _tx_get(list(_INDICES.values()))
+        data = _tx_get_index(list(_INDICES.values()))
         if not data:
             return "暂时无法获取指数行情。"
         now = datetime.now().strftime("%Y-%m-%d %H:%M")

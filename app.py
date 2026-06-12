@@ -141,6 +141,15 @@ INTRODUCTION = """
 
 with gr.Blocks(
     title="财智助手 - AI 金融分析师",
+    theme=gr.themes.Soft(
+        primary_hue="emerald",
+        secondary_hue="slate",
+    ),
+    css="""
+    .message.svelte-1lcyrx4 { font-size: 15px; }
+    .example-btn { margin: 3px !important; }
+    footer { display: none !important; }
+    """,
 ) as demo:
 
     # 会话 ID（每次刷新页面生成新的）
@@ -270,13 +279,4 @@ if __name__ == "__main__":
         share=False,
         show_error=True,
         inbrowser=True,   # 自动在浏览器中打开
-        theme=gr.themes.Soft(
-            primary_hue="emerald",
-            secondary_hue="slate",
-        ),
-        css="""
-        .message.svelte-1lcyrx4 { font-size: 15px; }
-        .example-btn { margin: 3px !important; }
-        footer { display: none !important; }
-        """,
     )

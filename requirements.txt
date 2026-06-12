@@ -4,7 +4,10 @@ langchain-community>=0.3.0
 langchain-openai>=0.2.0
 langchain-text-splitters>=0.3.0
 langchain-chroma>=0.1.4
-langchain-classic>=0.1.0    # AgentExecutor / create_react_agent（兼容旧 API）
+langchain-huggingface>=0.1.0   # HuggingFaceEmbeddings（替代已弃用的 community 版）
+
+# Agent 框架（create_react_agent / MemorySaver）
+langgraph>=0.2.0
 
 # 向量数据库
 chromadb>=0.5.0
@@ -12,8 +15,7 @@ chromadb>=0.5.0
 # 本地嵌入模型（无需 API Key）
 sentence-transformers>=3.0.0
 
-# 金融数据
-akshare>=1.16.0          # A股/港股/美股实时数据（免费、无需Key）
+# 数据处理
 pandas>=2.2.0
 numpy>=1.26.0
 

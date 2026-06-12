@@ -2,10 +2,10 @@
 middleware/callbacks.py - Agent 中间件（回调处理器）
 负责：日志记录 / 工具调用追踪 / 执行时间统计
 
-注意: 迁移到 LangGraph 后此模块尚未接入。
-LangGraph 的回调通过 astream_events() 或 CallbackHandler 实现，
-与 langchain_classic 的 AgentExecutor 回调机制不同。
-待后续适配 LangGraph 回调后再启用。
+接入方式：在 agent.invoke 时通过 config={"callbacks": [FinanceAgentCallback()]}
+传入（见 agent.py:get_agent_response）。LangGraph 复用 langchain_core 的回调机制，
+on_llm_* / on_tool_* 会正常触发；on_agent_action / on_agent_finish 是 langchain_classic
+AgentExecutor 的钩子，在 LangGraph 下不会被调用，仅作兼容保留。
 """
 
 import time
@@ -35,6 +35,7 @@ class FinanceAgentCallback(BaseCallbackHandler):
 
     def on_llm_start(self, serialized: Dict, prompts: List[str], **kwargs):
         self._llm_start_time = time.time()
+        serialized = serialized or {}
         model = serialized.get("kwargs", {}).get("model_name", "unknown")
         logger.debug(f"[LLM 开始] 模型: {model}, Prompt 数量: {len(prompts)}")
 
@@ -57,6 +58,7 @@ class FinanceAgentCallback(BaseCallbackHandler):
     # ── 工具调用 ────────────────────────────────────────────
 
     def on_tool_start(self, serialized: Dict, input_str: str, **kwargs):
+        serialized = serialized or {}
         tool_name = serialized.get("name", "unknown_tool")
         self._tool_start_time[tool_name] = time.time()
         logger.info(f"[工具调用] ▶ {tool_name}")
@@ -85,6 +87,7 @@ class FinanceAgentCallback(BaseCallbackHandler):
     # ── 链 ──────────────────────────────────────────────────
 
     def on_chain_start(self, serialized: Dict, inputs: Dict, **kwargs):
+        serialized = serialized or {}
         chain_name = serialized.get("id", ["unknown"])[-1]
         logger.debug(f"[链开始] {chain_name}")
 

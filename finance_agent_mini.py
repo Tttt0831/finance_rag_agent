@@ -120,7 +120,7 @@ tools = [get_current_time, compound_calculator, search_knowledge]
 # ║  Chunk: 文档切分的小块。不能太大(超 token 限制)也不能太小(缺上下文)           ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document

@@ -152,7 +152,7 @@ if __name__ == "__main__":
 # ║  3. 检索出来的结果是"原文"还是"AI 总结"？                                  ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
