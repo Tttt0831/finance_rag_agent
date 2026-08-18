@@ -3,6 +3,7 @@ services/vector_store.py - 向量存储服务
 负责：文档加载 → 文本分割 → Embedding → 存入/读取 Chroma 向量库
 """
 
+import hashlib
 import os
 from typing import List
 
@@ -73,6 +74,10 @@ class VectorStoreService:
             separators=["\n\n", "\n", "。", "；", "！", "？", "，", " ", ""],
         )
         self._indexed_md5 = _load_indexed_md5()
+        # 文档变更版本号：入库后 +1，混合检索据此重建 BM25 语料
+        self._version = 0
+        # 父子块模式下的父块集合（懒加载，见 _parents_store）
+        self._parents_store = None
         self._initialized = True
         logger.info("向量存储服务初始化完成。")
 
@@ -89,8 +94,8 @@ class VectorStoreService:
         """
         将文件入库。自动根据扩展名选择 Loader，并做 MD5 去重。
 
-        Args:
-            file_path: 本地文件路径
+        当 settings.enable_parent_child 为 True 时走父子块双写，
+        否则走扁平切分（默认，向后兼容）。
 
         Returns:
             {"status": "success"|"skipped", "chunks": int, "md5": str}
@@ -103,20 +108,24 @@ class VectorStoreService:
             logger.info(f"[跳过] 文件已入库: {os.path.basename(file_path)} ({md5[:8]}...)")
             return {"status": "skipped", "chunks": 0, "md5": md5}
 
+        source = os.path.basename(file_path)
         docs = self._load_file(file_path)
-        chunks = self._splitter.split_documents(docs)
+        if settings.enable_parent_child:
+            n = self._add_small2big(docs, source, md5)
+        else:
+            chunks = self._splitter.split_documents(docs)
+            for chunk in chunks:
+                chunk.metadata["source_file"] = source
+                chunk.metadata["md5"] = md5
+            self._vectorstore.add_documents(chunks)
+            n = len(chunks)
 
-        # 注入元数据
-        for chunk in chunks:
-            chunk.metadata["source_file"] = os.path.basename(file_path)
-            chunk.metadata["md5"] = md5
-
-        self._vectorstore.add_documents(chunks)
         _save_md5(md5)
         self._indexed_md5.add(md5)
+        self._version += 1
 
-        logger.info(f"[入库成功] {os.path.basename(file_path)} → {len(chunks)} 个块")
-        return {"status": "success", "chunks": len(chunks), "md5": md5}
+        logger.info(f"[入库成功] {source} → {n} 个块")
+        return {"status": "success", "chunks": n, "md5": md5}
 
     def add_texts(self, texts: List[str], metadatas: List[dict] = None) -> int:
         """直接将文本列表入库（用于内置知识预加载）。"""
@@ -124,10 +133,91 @@ class VectorStoreService:
             Document(page_content=t, metadata=m or {})
             for t, m in zip(texts, metadatas or [{}] * len(texts))
         ]
-        chunks = self._splitter.split_documents(docs)
-        self._vectorstore.add_documents(chunks)
-        logger.info(f"[文本入库] {len(texts)} 条文本 → {len(chunks)} 个块")
-        return len(chunks)
+        if settings.enable_parent_child:
+            n = self._add_small2big(docs, "内置知识", None)
+        else:
+            chunks = self._splitter.split_documents(docs)
+            self._vectorstore.add_documents(chunks)
+            n = len(chunks)
+        self._version += 1
+        logger.info(f"[文本入库] {len(texts)} 条文本 → {n} 个块")
+        return n
+
+    # ── 检索辅助（供混合检索 / 父子块展开使用）─────────────
+
+    @property
+    def version(self) -> int:
+        """文档变更版本号，混合检索据此判断是否重建 BM25。"""
+        return self._version
+
+    def get_all_documents(self) -> List[Document]:
+        """读取主集合全部文档（供 BM25 语料构建）。"""
+        data = self._vectorstore.get()
+        ids = data.get("ids", [])
+        texts = data.get("documents", [])
+        metas = data.get("metadatas", []) or [{}] * len(texts)
+        return [
+            Document(page_content=t, metadata={**(m or {}), "id": i})
+            for i, t, m in zip(ids, texts, metas)
+        ]
+
+    def get_parents(self, parent_ids: List[str]) -> List[Document]:
+        """按 parent_id 直接取回父块（无需向量检索）。"""
+        if not parent_ids:
+            return []
+        store = self._get_parents_store()
+        if store is None:
+            return []
+        data = store.get(ids=list(parent_ids))
+        texts = data.get("documents", [])
+        metas = data.get("metadatas", []) or [{}] * len(texts)
+        return [
+            Document(page_content=t, metadata=m or {})
+            for t, m in zip(texts, metas)
+        ]
+
+    def _get_parents_store(self) -> "Chroma":
+        """父块集合（懒加载）。"""
+        if self._parents_store is None:
+            self._parents_store = Chroma(
+                persist_directory=settings.chroma_persist_dir,
+                embedding_function=self._embeddings,
+                collection_name="finance_knowledge_parents",
+            )
+        return self._parents_store
+
+    def _add_small2big(self, docs: List[Document], source: str, md5: str) -> int:
+        """
+        父子块（small-to-big）双写：
+        - 父块（大）入父集合，带 parent_id；
+        - 子块（小）入主集合，带 parent_id metadata 指向父块。
+        标题（此处以来源文件名近似）随子块复制，缓解语义漂移。
+        """
+        parent_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=settings.parent_chunk_size, chunk_overlap=40,
+            separators=["\n\n", "\n", "。", "；", "！", "？", "，", " ", ""],
+        )
+        child_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=settings.child_chunk_size, chunk_overlap=32,
+            separators=["\n\n", "\n", "。", "；", "！", "？", "，", " ", ""],
+        )
+        parents = parent_splitter.split_documents(docs)
+        parent_docs, child_docs = [], []
+        for p in parents:
+            pid = hashlib.md5(f"{source}:{p.page_content}".encode("utf-8")).hexdigest()
+            parent_docs.append(Document(
+                page_content=p.page_content,
+                metadata={"parent_id": pid, "source_file": source, "md5": md5},
+            ))
+            for c in child_splitter.split_text(p.page_content):
+                child_docs.append(Document(
+                    page_content=f"{source}：{c}",   # 标题随块复制
+                    metadata={"parent_id": pid, "source_file": source, "md5": md5},
+                ))
+        self._get_parents_store().add_documents(parent_docs)
+        self._vectorstore.add_documents(child_docs)
+        logger.info(f"[父子块入库] {source} → {len(parents)} 父块 / {len(child_docs)} 子块")
+        return len(child_docs)
 
     def similarity_search(self, query: str, k: int = None) -> List[Document]:
         """直接执行相似度搜索，返回 Document 列表。"""

@@ -6,8 +6,13 @@ langchain-text-splitters>=0.3.0
 langchain-chroma>=0.1.4
 langchain-huggingface>=0.1.0   # HuggingFaceEmbeddings（替代已弃用的 community 版）
 
-# Agent 框架（create_react_agent / MemorySaver）
+# Agent 框架（create_react_agent / MemorySaver / SqliteSaver）
 langgraph>=0.2.0
+langgraph-checkpoint-sqlite>=1.0.0
+
+# 混合检索（BM25 + RRF）
+rank_bm25>=0.2.2
+jieba>=0.42.1
 
 # 向量数据库
 chromadb>=0.5.0

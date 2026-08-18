@@ -38,3 +38,6 @@ Thumbs.db
 # 临时文件
 _test_*.py
 _test_*.txt
+
+# 评测产物
+eval/report.json

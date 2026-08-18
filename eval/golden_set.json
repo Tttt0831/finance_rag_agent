@@ -1,0 +1,19 @@
+[
+  {"id": 1, "question": "什么是股票？A股在哪里上市交易？", "gold_keywords": ["所有权凭证", "上海证券交易所", "深圳证券交易所"]},
+  {"id": 2, "question": "上海证券交易所的股票代码有什么特征？", "gold_keywords": ["6 开头", "600519"]},
+  {"id": 3, "question": "创业板股票代码以什么开头？", "gold_keywords": ["3 开头", "创业板"]},
+  {"id": 4, "question": "A股主板和创业板的涨跌幅限制分别是多少？", "gold_keywords": ["±10%", "±20%"]},
+  {"id": 5, "question": "什么是市盈率？它的计算公式是什么？", "gold_keywords": ["市盈率", "每股收益", "EPS"]},
+  {"id": 6, "question": "市盈率低于多少算低估？", "gold_keywords": ["PE < 15", "偏低"]},
+  {"id": 7, "question": "什么是市净率？它适合什么类型的行业？", "gold_keywords": ["市净率", "每股净资产", "资产重"]},
+  {"id": 8, "question": "ROE是什么指标？连续多少算优质公司？", "gold_keywords": ["净资产收益率", "ROE > 15%"]},
+  {"id": 9, "question": "价值投资是谁创立的？核心原则有哪些？", "gold_keywords": ["格雷厄姆", "安全边际", "护城河"]},
+  {"id": 10, "question": "成长投资主要看哪些指标？", "gold_keywords": ["营收增速", "PEG"]},
+  {"id": 11, "question": "沪深300指数跟踪什么样的公司？", "gold_keywords": ["沪深300", "300 家"]},
+  {"id": 12, "question": "什么是指数基金定投？", "gold_keywords": ["定投", "每月固定"]},
+  {"id": 13, "question": "2%风险法则指的是什么？", "gold_keywords": ["2%", "单笔交易最大亏损"]},
+  {"id": 14, "question": "止损策略有哪些常见类型？", "gold_keywords": ["技术止损", "比例止损", "时间止损"]},
+  {"id": 15, "question": "股票型基金的股票仓位要求是多少？", "gold_keywords": ["股票仓位", "≥ 80%"]},
+  {"id": 16, "question": "降息对股市通常有什么影响？", "gold_keywords": ["降息", "利好"]},
+  {"id": 17, "question": "PMI指数大于50说明什么？", "gold_keywords": ["PMI", "扩张"]}
+]

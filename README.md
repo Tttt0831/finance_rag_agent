@@ -260,3 +260,39 @@ A: skeleton 是不完整的（需填空），mini 是能跑的单文件参考，
 | API 服务 | FastAPI |
 | 金融数据 | 腾讯财经 API + 天天基金 API |
 | 配置 | pydantic-settings + python-dotenv |
+
+---
+
+## 🚀 生产化升级（对照 Agent 开发知识库检查表）
+
+在原「能跑」基础上补齐了五处生产化能力，全部默认开或默认关、可回退：
+
+| 能力 | 文件 | 默认 | 说明 |
+|------|------|------|------|
+| 混合检索 BM25 + RRF | `services/hybrid_retriever.py` | ✅ 开 | 补稠密检索对专有名词的短板，RRF 融合两路排名 |
+| 金标集评测 | `eval/golden_set.json` + `eval/evaluate.py` | — | Recall@k / MRR / Faithfulness，检索段离线可跑 |
+| 会话落盘 + 熔断 | `agent.py` / `middleware/callbacks.py` | ✅ 开 | SqliteSaver 落盘；步数上限 + token 预算熔断 |
+| 上下文 compaction | `agent.py` | ✅ 开 | token 超水位压缩旧轮次为摘要 |
+| 检索可观测 | `middleware/trace.py` | ✅ 开 | 检索 span 记 doc_id/来源/分数，落盘 JSONL |
+| 查询改写 | `services/rag_service.py` | ⬜ 关 | 口语补全 / 多意图分解（`ENABLE_QUERY_REWRITE=true`）|
+| 流式输出 | `agent.py` / `app.py` | ✅ 开 | 逐字渲染，非流式 `chat()` 作回退 |
+| Rerank 精排 | `services/hybrid_retriever.py` | ⬜ 关 | `ENABLE_RERANK=true`，首次下载 bge-reranker（1~2GB）|
+| 父子块切分 | `services/vector_store.py` | ⬜ 关 | `ENABLE_PARENT_CHILD=true`，开启后删除 `data/chroma_db` 重建 |
+
+### 快速评测
+
+```bash
+pip install -r requirements.txt
+python eval/evaluate.py              # 混合检索，离线跑（无需 API Key）
+python eval/evaluate.py --dense-only # 纯稠密 A/B 对比
+python eval/evaluate.py --generate   # 追加生成段 Faithfulness（需 API Key）
+```
+
+### 检索 trace 查询
+
+会话结束后 trace 落盘 `./logs/traces/<session_id>.jsonl`，可通过
+`GET http://localhost:8000/trace/{session_id}` 查看（含每次召回的 doc_id 与分数）。
+
+> ⚠️ 切换 `enable_rerank` / `enable_parent_child` / `embedding_model` 后需删除
+> `data/chroma_db` 重建索引，否则新旧向量混存。
+

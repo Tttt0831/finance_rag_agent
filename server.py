@@ -3,6 +3,7 @@ server.py - 文档上传 Web 服务（FastAPI）
 提供 REST API 接口，可独立部署或与 Gradio 并行运行
 """
 
+import json
 import os
 from typing import List
 
@@ -127,6 +128,20 @@ def list_uploaded_files():
             "size_kb": round(os.path.getsize(filepath) / 1024, 2),
         })
     return {"files": files, "count": len(files)}
+
+
+@app.get("/trace/{session_id}", summary="获取会话 trace")
+def get_trace(session_id: str):
+    """
+    读取某会话的结构化 trace（llm_call / tool_call / retrieval 三类 span）。
+    trace 由 agent.get_agent_response 结束时落盘到 ./logs/traces/<session_id>.jsonl。
+    """
+    path = os.path.join(settings.trace_dir, f"{session_id[:32]}.jsonl")
+    spans = []
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            spans = [json.loads(line) for line in f if line.strip()]
+    return {"session_id": session_id, "count": len(spans), "spans": spans}
 
 
 if __name__ == "__main__":

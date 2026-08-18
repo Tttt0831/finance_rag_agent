@@ -11,7 +11,7 @@ import os
 import uuid
 import gradio as gr
 
-from agent import create_finance_agent, get_agent_response
+from agent import create_finance_agent, get_agent_response, stream_agent
 from services.vector_store import vector_store_service
 from utils.logger import get_logger
 
@@ -71,6 +71,30 @@ def chat(
     history.append({"role": "user", "content": user_message})
     history.append({"role": "assistant", "content": response})
     return "", history
+
+
+async def chat_stream(
+    user_message: str,
+    history: list,
+    session_id: str,
+):
+    """
+    流式处理用户消息（逐字渲染）。基于 agent.stream_agent 的 token 事件。
+    若 Gradio 版本不支持流式生成器，可回退到上面的 chat()（见下方事件绑定）。
+    """
+    if not user_message.strip():
+        yield "", history
+        return
+
+    logger.info(f"[用户({session_id[:8]})] {user_message}")
+    history.append({"role": "user", "content": user_message})
+    history.append({"role": "assistant", "content": ""})
+
+    async for ev in stream_agent(_agent, user_message, session_id):
+        if ev.get("event") == "token":
+            history[-1]["content"] += ev["data"]
+            yield "", history
+    logger.info(f"[Agent 回复(流式)] {history[-1]['content'][:100]}...")
 
 
 def upload_document(files, status_text: str) -> str:
@@ -236,10 +260,12 @@ with gr.Blocks(
 """)
 
     # ── 事件绑定 ──────────────────────────────────────────────
+    # 默认走流式（chat_stream）；若 Gradio 版本不支持流式生成器，
+    # 把下面两处 fn=chat_stream 改回 fn=chat 即可（非流式回退）。
 
     # 发送消息（点击按钮）
     submit_btn.click(
-        fn=chat,
+        fn=chat_stream,
         inputs=[user_input, chatbot, session_id],
         outputs=[user_input, chatbot],
         queue=True,
@@ -247,7 +273,7 @@ with gr.Blocks(
 
     # 发送消息（回车）
     user_input.submit(
-        fn=chat,
+        fn=chat_stream,
         inputs=[user_input, chatbot, session_id],
         outputs=[user_input, chatbot],
         queue=True,

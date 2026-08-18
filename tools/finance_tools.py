@@ -148,8 +148,8 @@ def search_knowledge_base(query: str = "") -> str:
         logger.error(f"RAG LLM检索失败，降级为直接向量搜索: {e}")
         # 降级方案：跳过 LLM 总结，直接返回原始文档片段
         try:
-            from services.vector_store import vector_store_service
-            docs = vector_store_service.similarity_search(str(query), k=3)
+            from services.hybrid_retriever import hybrid_retriever
+            docs = hybrid_retriever.search(str(query), k=3)
             if docs:
                 parts = [f"[来源] {d.metadata.get('source_file','知识库')}\n{d.page_content}" for d in docs]
                 return "（直接检索结果，未经 LLM 总结）\n\n" + "\n\n---\n\n".join(parts)
